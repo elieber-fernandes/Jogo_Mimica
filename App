@@ -1,151 +1,163 @@
 from kivy.lang import Builder
+from kivy.properties import StringProperty
 from kivymd.app import MDApp
 from kivy.uix.screenmanager import ScreenManager
 from kivy.uix.screenmanager import Screen
-from kivymd.uix.card import MDCard
+from kivymd.uix.behaviors import RoundedRectangularElevationBehavior
 from kivymd.uix.button import MDIconButton
+from kivymd.uix.label import MDLabel
+from kivymd.uix.card import MDCard
+
 import requests
 from bs4 import BeautifulSoup
 
 KV = '''
 
 Screen_Manager:
-    Tela_Inicio:
-    Tela_Jogo:
-    Tela_Palavra:	
+Tela_Inicio:
+Tela_Jogo:
+Tela_Palavra:
+
+<Tela_Inicio>
+
+name:"tela_inicio"     
+
+MDFloatLayout:
+	id: fl_inicio
+	
+	
+	
+    MDTextField:
+        id: field_time1
+        hint_text:'Nome do time 1'
+        size_hint: 1, None
+        mode: "rectangle"
+        height: "10dp"
+        max_text_length: 10
+        pos_hint: {"center_x": .5, "center_y": .5} 
+		size_hint: (.55, .06 )
+	
+	   
+    
+    MDTextField:
+        id: field_time2
+        hint_text:'Nome do time 2'
+        size_hint: 1, None
+        mode: "rectangle"
+        height: "10dp"
+        max_text_length: 10
+        pos_hint: {"center_x": .5, "center_y": .4} 
+		size_hint: (.55, .06 )
+		
+	
+	
+
+	MDFillRoundFlatButton
+		id: btn_jogar
+		text: "Jogar"
+		on_release: root.manager.current="tela_jogo" 
+		pos_hint: {"center_x": .5, "center_y": .1} 
+		size_hint: (.95, .1) 
+		font_size: "16sp"
+		md_bg_color: .1, .1, .5, 1
+
+<Tela_Palavra>
+name:"tela_palavra"
 
 <Tela_Jogo>
-	
-    name: "tela_jogo"
+id: tela_jogo
+name: "tela_jogo"
 
-    MDFloatLayout:
-        id: fl
+MDFloatLayout:
+    id: fl
+    
+
+    MDToolbar:
+        title: "Mímica"
+        pos_hint: {"center_y": .97}
         
- 
-        MDToolbar:
-            title: "Jogo Da Mímica"
-            pos_hint: {"center_y": .97}
+    MDRectangleFlatButton
+        id: time1
+    
+        text: 
+        pos_hint: {"center_x": .1, "center_y": .90}
+        size_hint: (.55, .05)
+        font_size: "24sp"
+        
+    MDRectangleFlatButton
+        id: time2
+    
+        text: 
+        pos_hint: {"center_x": .90, "center_y": .90}
+        size_hint: (.55, .05)
+        font_size: "24sp"
+    
+    MDIconButton 
+        icon: "refresh"
+        user_font_size: "44sp"
+        pos_hint: {"center_x": .2, "center_y": .1}
+        on_release: root.callback()
+          
+    MDIconButton 
+        icon: "arrow-left"
+        user_font_size: "44sp"
+        pos_hint: {"center_x": .8, "center_y": .1}
+        on_release:
+        	root.manager.transition.direction = 'left'
+            root.manager.current="tela_inicio"
+            
+    
+   
+    MDRectangleFlatButton
 
-        MDIconButton 
-            icon: "refresh"
-            user_font_size: "44sp"
-            pos_hint: {"center_x": .2, "center_y": .1}
-            on_release: root.callback()
-              
-        MDIconButton 
-            icon: "arrow-left"
-            user_font_size: "44sp"
-            pos_hint: {"center_x": .8, "center_y": .1}
-            on_release:
-            	root.manager.transition.direction = 'left'
-                root.manager.current="tela_inicio"
-                
-        MDRectangleFlatButton
+		id:palavra1
+    	
+        text: root.palavra1
+        pos_hint: {"center_x": .5, "center_y": .70} 
+        size_hint: (.95, .1)
+        font_size: "24sp"
 
-			id:palavra1
-        	
-            text: root.palavra1
-            pos_hint: {"center_x": .5, "center_y": .70} 
-            size_hint: (.95, .1)
-            font_size: "24sp"
-  
-		MDRectangleFlatButton
+	MDRectangleFlatButton
 
-			id:palavra2
-			
-            text: root.palavra2
-            pos_hint: {"center_x": .5, "center_y": .55} 
-            size_hint: (.95, .1)
-            font_size: "24sp"            
-
-		MDRectangleFlatButton
-
-			id:palavra3
-			
-            text: root.palavra3
-            pos_hint: {"center_x": .5, "center_y": .40} 
-            size_hint: (.95, .1)
-            font_size: "24sp"               
-                                    
-		MDRectangleFlatButton
-
-			id:palavra4
-			
-            text: root.palavra4
-            pos_hint: {"center_x": .5, "center_y": .25} 
-            size_hint: (.95, .1)
-            font_size: "24sp" 	
-			                       
-<Tela_Inicio>
-	
-	name:"tela_inicio"    
-
-	MDFloatLayout:
-		id: fl_inicio
+		id:palavra2
 		
+        text: root.palavra2
+        pos_hint: {"center_x": .5, "center_y": .55} 
+        size_hint: (.95, .1)
+        font_size: "24sp"            
+
+	MDRectangleFlatButton
+
+		id:palavra3
 		
-		MDIconButton 
-			id: btn_fechar
-			icon: "close"
-            user_font_size: "10sp"			
-			on_release: root.removecard()
-			pos_hint: {"center_x": .85, "center_y": .73} 
-			
-			
+        text: root.palavra3
+        pos_hint: {"center_x": .5, "center_y": .40} 
+        size_hint: (.95, .1)
+        font_size: "24sp"               
+                                
+	MDRectangleFlatButton
+
+		id:palavra4
 		
-		MDFillRoundFlatButton
-			id: btn_add
-			text: "Cadastrar Times"
-			on_release: root.addcard()
-			pos_hint: {"center_x": .5, "center_y": .5} 
-			size_hint: (.70, .1) 
-			font_size: "16sp"
-			md_bg_color: .1, .1, .5, 1
-		
-		MDFillRoundFlatButton
-			id: btn_jogar
-			text: "Jogar"
-			on_release: root.manager.current="tela_jogo" 
-			pos_hint: {"center_x": .5, "center_y": .1} 
-			size_hint: (.95, .1) 
-			font_size: "16sp"
-			md_bg_color: .1, .1, .5, 1
-		       
-<Tela_Palavra>
-	name:"tela_palavra"
+        text: root.palavra4
+        pos_hint: {"center_x": .5, "center_y": .25} 
+        size_hint: (.95, .1)
+        font_size: "24sp" 	
 
 '''
-
 
 class Screen_Manager(ScreenManager):
 	pass
 
-
 class Tela_Inicio(Screen):
-	def __init__(self,**kwargs):
-		super().__init__(**kwargs)
-		self.card = MDCard(orientation= "vertical",padding =16, size_hint= (0.8, 0.5), pos_hint={'center_x':0.5,'center_y':0.5},focus_behavior= True)
-		
-		#TESTE#
-		'''self.icon = MDIconButton(icon= "close", user_font_size= "10sp",on_release= self.removecard(), pos_hint= {"center_x": .85, "center_y": .73} )'''
-		
-	
-	def removecard(self):
-	   #self.ids.fl_inicio.remove_widget(self.icon)
-	   self.ids.fl_inicio.remove_widget(self.card)
-	   self.ids.fl_inicio.add_widget(self.ids.btn_add)
-	   
-	def addcard(self):
-	   #self.ids.fl_inicio.add_widget(self.icon)
-	   self.ids.fl_inicio.add_widget(self.card)
-	   self.ids.fl_inicio.remove_widget(self.ids.btn_add)
-	
+	def init(self, **kwargs):
+		super().init(**kwargs)
 
 class Tela_Jogo(Screen):
-	def __init__(self, **kwargs):
-		super().__init__(**kwargs)
+	def init(self, **kwargs):
+		super().init(**kwargs)
 		self.page = requests.get(
-		    "https://www.palabrasaleatorias.com/palavras-aleatorias.php?fs=4&fs2=0&Submit=Nova+palavra"
+		"https://www.palabrasaleatorias.com/palavras-aleatorias.php?fs=4&fs2=0&Submit=Nova+palavra"
 		)
 		self.soup = BeautifulSoup(self.page.content, 'html.parser')
 		self.palavra1 = (self.soup.find_all('div')[1].get_text())
@@ -153,25 +165,22 @@ class Tela_Jogo(Screen):
 		self.palavra3 = (self.soup.find_all('div')[3].get_text())
 		self.palavra4 = (self.soup.find_all('div')[4].get_text())
 
-	def callback(self):
-		page = requests.get(
-		    "https://www.palabrasaleatorias.com/palavras-aleatorias.php?fs=4&fs2=0&Submit=Nova+palavra"
-		)
-		soup = BeautifulSoup(page.content, 'html.parser')
-		self.ids.palavra1.text = (soup.find_all('div')[1].get_text())
-		self.ids.palavra2.text = (soup.find_all('div')[2].get_text())
-		self.ids.palavra3.text = (soup.find_all('div')[3].get_text())
-		self.ids.palavra4.text = (soup.find_all('div')[4].get_text())
-
+def callback(self):
+	page = requests.get(
+	    "https://www.palabrasaleatorias.com/palavras-aleatorias.php?fs=4&fs2=0&Submit=Nova+palavra"
+	)
+	soup = BeautifulSoup(page.content, 'html.parser')
+	self.ids.palavra1.text = (soup.find_all('div')[1].get_text())
+	self.ids.palavra2.text = (soup.find_all('div')[2].get_text())
+	self.ids.palavra3.text = (soup.find_all('div')[3].get_text())
+	self.ids.palavra4.text = (soup.find_all('div')[4].get_text())
 
 class Tela_Palavra(Screen):
 	pass
-
 
 class App(MDApp):
 	def build(self):
 		self.screen = Builder.load_string(KV)
 		return self.screen
-
 
 App().run()
