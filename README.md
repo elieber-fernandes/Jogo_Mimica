@@ -21,6 +21,4 @@ Um jogo de mímica digital feito em Python com KivyMD.
    python app.py
    ```
 
-## Sobre
 
-Feito para brincar de mímica com amigos e família, facilitando a organização e a diversão!
