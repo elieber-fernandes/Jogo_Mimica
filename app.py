@@ -19,6 +19,7 @@ MDScreenManager:
     PalavrasScreen:
     ResultadoScreen:
     PlacarScreen:
+    ConfiguracoesScreen:
 
 <MenuScreen>:
     name: "menu"
@@ -65,6 +66,11 @@ MDScreenManager:
                 size_hint_x: 0.5
                 radius: [16, 16, 16, 16]
                 on_release: app.go_to_jogadores(nome_time.text)
+
+            MDTextButton:
+                text: "Configurações"
+                pos_hint: {"center_x": .5}
+                on_release: app.open_configuracoes()
 
 <JogadoresScreen>:
     name: "jogadores"
@@ -257,6 +263,78 @@ MDScreenManager:
             radius: [16, 16, 16, 16]
             md_bg_color: app.theme_cls.primary_dark
             on_release: app.novo_jogo()
+
+<ConfiguracoesScreen>:
+    name: "config"
+    MDBoxLayout:
+        orientation: "vertical"
+        padding: [32, 48, 32, 48]
+        spacing: 24
+
+        MDCard:
+            orientation: "vertical"
+            padding: 24
+            size_hint: 0.95, None
+            height: self.minimum_height
+            pos_hint: {"center_x": .5}
+            elevation: 12
+            radius: [24, 24, 24, 24]
+            shadow_softness: 2
+            shadow_offset: [0, 2]
+            spacing: 16
+
+            MDLabel:
+                text: "Configurações"
+                halign: "center"
+                font_style: "H5"
+                theme_text_color: "Primary"
+
+                
+            MDTextField:
+                id: duracao_input
+                hint_text: "Duração da rodada (segundos)"
+                text: str(app.duracao_rodada)
+                mode: "rectangle"
+                size_hint_x: 0.8
+                pos_hint: {"center_x": .5}
+                input_filter: "int"
+
+            MDTextField:
+                id: opcoes_input
+                hint_text: "Número de opções de palavras"
+                text: str(app.num_opcoes)
+                mode: "rectangle"
+                size_hint_x: 0.8
+                pos_hint: {"center_x": .5}
+                input_filter: "int"
+
+            MDBoxLayout:
+                orientation: "horizontal"
+                size_hint_y: None
+                height: "48dp"
+                spacing: 12
+                pos_hint: {"center_x": .5}
+                MDLabel:
+                    text: "Usar palavras online"
+                    halign: "left"
+                    theme_text_color: "Primary"
+                MDSwitch:
+                    id: online_switch
+                    active: app.usar_online
+                    pos_hint: {"center_y": .5}
+
+            MDRaisedButton:
+                text: "Salvar"
+                pos_hint: {"center_x": .5}
+                size_hint_x: 0.6
+                radius: [16, 16, 16, 16]
+                md_bg_color: app.theme_cls.primary_color
+                on_release: app.salvar_configuracoes(duracao_input.text, opcoes_input.text, online_switch.active)
+
+        MDTextButton:
+            text: "Voltar"
+            pos_hint: {"center_x": .5}
+            on_release: app.root.current = "menu"
 '''
 
 class MenuScreen(MDScreen): pass
@@ -264,6 +342,7 @@ class JogadoresScreen(MDScreen): pass
 class PalavrasScreen(MDScreen): pass
 class ResultadoScreen(MDScreen): pass
 class PlacarScreen(MDScreen): pass
+class ConfiguracoesScreen(MDScreen): pass
 
 class MimicaApp(MDApp):
     def build(self):
@@ -278,6 +357,19 @@ class MimicaApp(MDApp):
         self.vencedor = ""
         self.time_index = 0
         self.jogador_index = 0
+        self.duracao_rodada = 60
+        self.num_opcoes = 4
+        self.usar_online = True
+        self.selected_button = None
+        # Lista offline de palavras para fallback
+        self.offline_palavras = [
+            "casa", "carro", "gato", "cachorro", "livro", "montanha", "praia", "telefone",
+            "computador", "janela", "porta", "mesa", "cadeira", "floresta", "rio", "cidade",
+            "avião", "bicicleta", "ônibus", "escola", "professor", "aluno", "bola", "música",
+            "dança", "pintura", "relógio", "sol", "lua", "estrela", "chuva", "neve", "vento",
+            "fogo", "água", "terra", "árvore", "flor", "fruta", "banana", "maçã", "laranja",
+            "uva", "melancia", "moto", "camisa", "calça", "sapato", "chapéu", "óculos"
+        ]
         return Builder.load_string(KV)
 
     def go_to_jogadores(self, nome_time):
@@ -287,6 +379,29 @@ class MimicaApp(MDApp):
         self.current_time = nome_time.strip()
         self.root.get_screen('jogadores').ids.time_label.text = f"Time: {self.current_time}"
         self.root.current = 'jogadores'
+
+    def open_configuracoes(self):
+        self.root.current = 'config'
+
+    def salvar_configuracoes(self, duracao_str, opcoes_str, online_active):
+        try:
+            duracao = int(duracao_str) if duracao_str else self.duracao_rodada
+            opcoes = int(opcoes_str) if opcoes_str else self.num_opcoes
+        except ValueError:
+            self.show_dialog("Valores inválidos. Use números inteiros.")
+            return
+        # Limites razoáveis
+        if duracao < 5:
+            duracao = 5
+        if opcoes < 2:
+            opcoes = 2
+        if opcoes > 8:
+            opcoes = 8
+        self.duracao_rodada = duracao
+        self.num_opcoes = opcoes
+        self.usar_online = bool(online_active)
+        self.show_dialog("Configurações salvas")
+        self.root.current = 'menu'
 
     def adicionar_time(self, nomes, adicionar_outro):
         nomes = [j.strip() for j in nomes.split(',') if j.strip()]
@@ -305,38 +420,90 @@ class MimicaApp(MDApp):
             self.carregar_palavras()
 
     def carregar_palavras(self):
+        from kivy.clock import Clock
+        import threading
+        import random
+
         jogador = self.jogadores[self.time_index][self.jogador_index]
         time = self.times[self.time_index]
-        
+
         # Atualiza as labels de instrução
         instrucao = self.root.get_screen('palavras').ids.instrucao
         jogador_info = self.root.get_screen('palavras').ids.jogador_info
         instrucao.text = "ESCOLHA UMA PALAVRA!"
         jogador_info.text = f"VEZ DE: {jogador} - ({time})"
 
-        try:
-            page = requests.get("https://www.palabrasaleatorias.com/palavras-aleatorias.php?fs=4&fs2=0&Submit=Nova+palavra")
-            soup = BeautifulSoup(page.content, 'html.parser')
-            divs = soup.find_all('div')
-            self.palavras = [divs[i].get_text() for i in range(1, 5)]
-        except Exception:
-            self.palavras = ["Palavra 1", "Palavra 2", "Palavra 3", "Palavra 4"]
-        
+        # Estado inicial da UI
         box = self.root.get_screen('palavras').ids.palavras_box
         box.clear_widgets()
-        for palavra in self.palavras:
-            box.add_widget(MDFlatButton(
-                text=palavra.upper(),
-                font_size="18sp",
-                size_hint_x=0.9,
-                pos_hint={"center_x": .5},
-                on_release=lambda x, p=palavra: self.selecionar_palavra(p)
-            ))
-        
+        box.add_widget(MDLabel(text="Carregando...", halign="center", size_hint_y=None, height="40dp"))
         self.root.get_screen('palavras').ids.confirmar_btn.disabled = True
         self.palavra_escolhida = ""
+        self.selected_button = None
 
-    def selecionar_palavra(self, palavra):
+        def fetch_words():
+            words = []
+            if self.usar_online:
+                try:
+                    page = requests.get("https://www.palabrasaleatorias.com/palavras-aleatorias.php?fs=4&fs2=0&Submit=Nova+palavra", timeout=5)
+                    soup = BeautifulSoup(page.content, 'html.parser')
+                    divs = soup.find_all('div')
+                    # Coleta textos visíveis e razoáveis
+                    candidates = [d.get_text(strip=True) for d in divs if d.get_text(strip=True)]
+                    # Remove duplicados mantendo ordem
+                    seen = set()
+                    for w in candidates:
+                        lw = w.lower()
+                        if lw not in seen and 2 <= len(lw) <= 20 and lw.isalpha():
+                            words.append(lw)
+                            seen.add(lw)
+                            if len(words) >= self.num_opcoes:
+                                break
+                except Exception:
+                    words = []
+
+            # Complementa com offline se necessário
+            if len(words) < self.num_opcoes:
+                restantes = self.num_opcoes - len(words)
+                offline_pool = [w for w in self.offline_palavras if w not in words]
+                if offline_pool:
+                    words.extend(random.sample(offline_pool, k=min(restantes, len(offline_pool))))
+            # Se ainda faltar, preenche com placeholders
+            while len(words) < self.num_opcoes:
+                words.append(f"palavra {len(words)+1}")
+
+            def update_ui(_dt):
+                box.clear_widgets()
+                self.palavras = words
+                for palavra in words:
+                    btn = MDFlatButton(
+                        text=palavra.upper(),
+                        font_size="18sp",
+                        size_hint_x=0.9,
+                        pos_hint={"center_x": .5},
+                        on_release=lambda b, p=palavra: self.selecionar_palavra(p, b)
+                    )
+                    box.add_widget(btn)
+                self.root.get_screen('palavras').ids.confirmar_btn.disabled = True
+                self.palavra_escolhida = ""
+
+            Clock.schedule_once(update_ui, 0)
+
+        threading.Thread(target=fetch_words, daemon=True).start()
+
+    def selecionar_palavra(self, palavra, btn):
+        # Destaque visual simples: altera cor do texto do selecionado
+        if getattr(self, 'selected_button', None) is not None:
+            try:
+                self.selected_button.theme_text_color = "Primary"
+            except Exception:
+                pass
+        try:
+            btn.theme_text_color = "Custom"
+            btn.text_color = self.theme_cls.primary_color
+        except Exception:
+            pass
+        self.selected_button = btn
         self.palavra_escolhida = palavra
         self.root.get_screen('palavras').ids.confirmar_btn.disabled = False
 
@@ -367,7 +534,7 @@ class MimicaApp(MDApp):
         box.add_widget(palavra_btn)
         
 
-        self.tempo = 6
+        self.tempo = int(self.duracao_rodada)
         self.timer_label = MDLabel(text=f"Tempo restante: {self.tempo} segundos", halign="center")
         box.add_widget(self.timer_label)
         self.timer_event = Clock.schedule_interval(self.update_timer, 1)
@@ -395,8 +562,15 @@ class MimicaApp(MDApp):
             layout.add_widget(checkbox)
             layout.add_widget(MDLabel(text=time, valign="center"))
             box.add_widget(layout)
-        # Ajusta a altura do times_box conforme o número de times
-        box.height = len(self.times) * 48
+        # Opção de ninguém acertou
+        layout = MDBoxLayout(orientation="horizontal", spacing=8, size_hint_y=None, height="48dp")
+        checkbox = MDCheckbox(group="vencedor")
+        checkbox.bind(active=partial(self.on_checkbox_active, "__NINGUEM__"))
+        layout.add_widget(checkbox)
+        layout.add_widget(MDLabel(text="Ninguém acertou", valign="center"))
+        box.add_widget(layout)
+        # Ajusta a altura do times_box conforme o número de opções
+        box.height = (len(self.times) + 1) * 48
 
     def on_checkbox_active(self, time, instance, value):
         if value:
@@ -406,7 +580,8 @@ class MimicaApp(MDApp):
         if not self.vencedor:
             self.show_dialog("Selecione o time vencedor")
             return
-        self.pontuacao[self.vencedor] += 1
+        if self.vencedor != "__NINGUEM__":
+            self.pontuacao[self.vencedor] += 1
 
         self.jogador_index += 1
         if self.jogador_index >= len(self.jogadores[self.time_index]):
@@ -420,13 +595,28 @@ class MimicaApp(MDApp):
     def carregar_placar(self):
         box = self.root.get_screen('placar').ids.placar_box
         box.clear_widgets()
-        for time, pontos in self.pontuacao.items():
-            box.add_widget(MDLabel(
-                text=f"{time}: {pontos} ponto(s)",
-                halign="center",
-                size_hint_y=None,
-                height="40dp"
-            ))
+        if not self.pontuacao:
+            return
+        itens_ordenados = sorted(self.pontuacao.items(), key=lambda kv: kv[1], reverse=True)
+        max_pontos = itens_ordenados[0][1]
+        for time, pontos in itens_ordenados:
+            destaque = pontos == max_pontos and max_pontos > 0
+            if destaque:
+                box.add_widget(MDLabel(
+                    text=f"{time}: {pontos} ponto(s)",
+                    halign="center",
+                    theme_text_color="Custom",
+                    text_color=self.theme_cls.primary_color,
+                    size_hint_y=None,
+                    height="40dp"
+                ))
+            else:
+                box.add_widget(MDLabel(
+                    text=f"{time}: {pontos} ponto(s)",
+                    halign="center",
+                    size_hint_y=None,
+                    height="40dp"
+                ))
 
     def proxima_rodada(self):
         self.root.current = 'palavras'
