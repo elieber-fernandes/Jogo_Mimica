@@ -7,12 +7,12 @@ from kivymd.uix.button import MDRaisedButton, MDFlatButton, MDTextButton
 from kivymd.uix.label import MDLabel
 from kivymd.uix.boxlayout import MDBoxLayout
 from kivymd.uix.textfield import MDTextField
-from kivymd.uix.gridlayout import MDGridLayout
 import requests
 from bs4 import BeautifulSoup
 from functools import partial
 
 KV = '''
+#:import dp kivy.metrics.dp
 MDScreenManager:
     MenuScreen:
     JogadoresScreen:
@@ -361,6 +361,10 @@ class MimicaApp(MDApp):
         self.num_opcoes = 4
         self.usar_online = True
         self.selected_button = None
+        self.dialog = None
+        self.timer_event = None
+        self.timer_label = None
+        self.mostrar = False
         # Lista offline de palavras para fallback
         self.offline_palavras = [
             "casa", "carro", "gato", "cachorro", "livro", "montanha", "praia", "telefone",
@@ -416,6 +420,9 @@ class MimicaApp(MDApp):
         else:
             self.time_index = 0
             self.jogador_index = 0
+            if not self.times or not self.jogadores or not self.jogadores[0]:
+                self.show_dialog("Adicione ao menos um time com um jogador")
+                return
             self.root.current = 'palavras'
             self.carregar_palavras()
 
@@ -423,6 +430,14 @@ class MimicaApp(MDApp):
         from kivy.clock import Clock
         import threading
         import random
+
+        if not self.times or not self.jogadores:
+            self.show_dialog("Adicione times e jogadores antes de iniciar")
+            self.root.current = 'menu'
+            return
+        if self.time_index >= len(self.times) or self.jogador_index >= len(self.jogadores[self.time_index]):
+            self.time_index = 0
+            self.jogador_index = 0
 
         jogador = self.jogadores[self.time_index][self.jogador_index]
         time = self.times[self.time_index]
@@ -445,20 +460,21 @@ class MimicaApp(MDApp):
             words = []
             if self.usar_online:
                 try:
-                    page = requests.get("https://www.palabrasaleatorias.com/palavras-aleatorias.php?fs=4&fs2=0&Submit=Nova+palavra", timeout=5)
-                    soup = BeautifulSoup(page.content, 'html.parser')
-                    divs = soup.find_all('div')
-                    # Coleta textos visíveis e razoáveis
-                    candidates = [d.get_text(strip=True) for d in divs if d.get_text(strip=True)]
-                    # Remove duplicados mantendo ordem
-                    seen = set()
-                    for w in candidates:
-                        lw = w.lower()
-                        if lw not in seen and 2 <= len(lw) <= 20 and lw.isalpha():
-                            words.append(lw)
-                            seen.add(lw)
-                            if len(words) >= self.num_opcoes:
-                                break
+                    response = requests.get("https://www.palabrasaleatorias.com/palavras-aleatorias.php?fs=4&fs2=0&Submit=Nova+palavra", timeout=5)
+                    if response.status_code == 200:
+                        soup = BeautifulSoup(response.content, 'html.parser')
+                        divs = soup.find_all('div')
+                        # Coleta textos visíveis e razoáveis
+                        candidates = [d.get_text(strip=True) for d in divs if d.get_text(strip=True)]
+                        # Remove duplicados mantendo ordem
+                        seen = set()
+                        for w in candidates:
+                            lw = w.lower()
+                            if lw not in seen and 2 <= len(lw) <= 20 and lw.isalpha():
+                                words.append(lw)
+                                seen.add(lw)
+                                if len(words) >= self.num_opcoes:
+                                    break
                 except Exception:
                     words = []
 
@@ -537,6 +553,13 @@ class MimicaApp(MDApp):
         self.tempo = int(self.duracao_rodada)
         self.timer_label = MDLabel(text=f"Tempo restante: {self.tempo} segundos", halign="center")
         box.add_widget(self.timer_label)
+        # Cancela timer anterior, se existir
+        try:
+            from kivy.clock import Clock as _Clock
+            if self.timer_event is not None:
+                _Clock.unschedule(self.timer_event)
+        except Exception:
+            pass
         self.timer_event = Clock.schedule_interval(self.update_timer, 1)
         self.root.get_screen('palavras').ids.confirmar_btn.disabled = True
 
@@ -545,7 +568,12 @@ class MimicaApp(MDApp):
         self.timer_label.text = f"Tempo restante: {self.tempo} segundos"
         if self.tempo <= 0:
             from kivy.clock import Clock
-            Clock.unschedule(self.timer_event)
+            try:
+                if self.timer_event is not None:
+                    Clock.unschedule(self.timer_event)
+            except Exception:
+                pass
+            self.timer_event = None
             self.root.current = 'resultado'
             self.carregar_resultado()
 
@@ -587,7 +615,7 @@ class MimicaApp(MDApp):
         if self.jogador_index >= len(self.jogadores[self.time_index]):
             self.jogador_index = 0
             self.time_index = (self.time_index + 1) % len(self.times)
-        self.vencedor = ""
+        self.vencedor = None
 
         self.root.current = 'placar'
         self.carregar_placar()
@@ -629,9 +657,17 @@ class MimicaApp(MDApp):
         self.current_time = ""
         self.palavra_escolhida = ""
         self.palavras = []
-        self.vencedor = ""
+        self.vencedor = None
         self.time_index = 0
         self.jogador_index = 0
+        # Cancela timer ativo
+        try:
+            from kivy.clock import Clock
+            if self.timer_event is not None:
+                Clock.unschedule(self.timer_event)
+        except Exception:
+            pass
+        self.timer_event = None
         self.root.current = 'menu'
 
     def show_dialog(self, text):
